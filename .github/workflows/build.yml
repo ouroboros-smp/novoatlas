@@ -14,7 +14,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: [self-hosted, crucible-pc]
     outputs:
       artifact: ${{ steps.upload.outputs.artifact-id }}
     steps:
