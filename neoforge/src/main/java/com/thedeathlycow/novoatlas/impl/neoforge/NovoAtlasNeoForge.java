@@ -1,15 +1,23 @@
 package com.thedeathlycow.novoatlas.impl.neoforge;
 
 import com.thedeathlycow.novoatlas.impl.NovoAtlas;
-import com.thedeathlycow.novoatlas.impl.gen.*;
-import com.thedeathlycow.novoatlas.impl.registry.ImageManager;
+import com.thedeathlycow.novoatlas.impl.gen.biome.BiomeCellColorMapBiomeSource;
+import com.thedeathlycow.novoatlas.impl.gen.biome.BoundedMapBiomeSource;
+import com.thedeathlycow.novoatlas.impl.gen.biome.ColorMapBiomeSource;
+import com.thedeathlycow.novoatlas.impl.gen.chunk.BlendImageToRandomChunkGenerator;
+import com.thedeathlycow.novoatlas.impl.gen.chunk.ImageMapChunkGenerator;
+import com.thedeathlycow.novoatlas.impl.gen.density.BlendAtMapBorder;
+import com.thedeathlycow.novoatlas.impl.gen.density.GetHeightFromMapDensityFunction;
+import com.thedeathlycow.novoatlas.impl.gen.density.GetPreliminaryHeightFromMapDensityFunction;
+import com.thedeathlycow.novoatlas.impl.gen.density.HeightmapDensityFunction;
+import com.thedeathlycow.novoatlas.impl.image.MapInfo;
+import com.thedeathlycow.novoatlas.impl.image.interpolation.Bicubic;
+import com.thedeathlycow.novoatlas.impl.image.interpolation.Bilinear;
+import com.thedeathlycow.novoatlas.impl.image.interpolation.Lanczos;
+import com.thedeathlycow.novoatlas.impl.image.interpolation.NearestNeighbour;
+import com.thedeathlycow.novoatlas.impl.registry.MapImageRegistry;
 import com.thedeathlycow.novoatlas.impl.registry.NovoAtlasBuiltinRegistries;
 import com.thedeathlycow.novoatlas.impl.registry.NovoAtlasRegistries;
-import com.thedeathlycow.novoatlas.impl.gen.biome.ColorMapBiomeSource;
-import com.thedeathlycow.novoatlas.impl.gen.interpolation.Bicubic;
-import com.thedeathlycow.novoatlas.impl.gen.interpolation.Bilinear;
-import com.thedeathlycow.novoatlas.impl.gen.interpolation.Lanczos;
-import com.thedeathlycow.novoatlas.impl.gen.interpolation.NearestNeighbour;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
@@ -19,7 +27,6 @@ import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.server.packs.repository.PackSource;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
-import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.AddPackFindersEvent;
 import net.neoforged.neoforge.event.AddServerReloadListenersEvent;
@@ -46,9 +53,7 @@ public final class NovoAtlasNeoForge {
 
     private static void addExamplePacks(AddPackFindersEvent event) {
         if (event.getPackType() == PackType.SERVER_DATA) {
-            PackSource packSource = FMLEnvironment.isProduction()
-                    ? PackSource.FEATURE
-                    : PackSource.WORLD;
+            PackSource packSource = NovoAtlas.enableExampleDataPacks() ? PackSource.WORLD : PackSource.FEATURE;
 
             event.addPackFinders(
                     NovoAtlas.id("resourcepacks/avila-basic-example"),
@@ -60,10 +65,19 @@ public final class NovoAtlasNeoForge {
             );
 
             event.addPackFinders(
+                    NovoAtlas.id("resourcepacks/avila-blend-to-random-example"),
+                    PackType.SERVER_DATA,
+                    Component.literal("novoatlas/avila-blend-to-random-example"),
+                    packSource,
+                    false,
+                    Pack.Position.TOP
+            );
+
+            event.addPackFinders(
                     NovoAtlas.id("resourcepacks/avila-cave-biome-example"),
                     PackType.SERVER_DATA,
                     Component.literal("novoatlas/avila-cave-biome-example"),
-                    PackSource.FEATURE,
+                    packSource,
                     false,
                     Pack.Position.TOP
             );
@@ -72,7 +86,7 @@ public final class NovoAtlasNeoForge {
                     NovoAtlas.id("resourcepacks/avila-no-caves-example"),
                     PackType.SERVER_DATA,
                     Component.literal("novoatlas/avila-no-caves-example"),
-                    PackSource.FEATURE,
+                    packSource,
                     false,
                     Pack.Position.TOP
             );
@@ -80,11 +94,23 @@ public final class NovoAtlasNeoForge {
     }
 
     private static void register(RegisterEvent event) {
-        event.register(Registries.CHUNK_GENERATOR, NovoAtlas.id("image_map"), () -> ImageMapChunkGenerator.CODEC);
-        event.register(Registries.BIOME_SOURCE, NovoAtlas.id("color_map"), () -> ColorMapBiomeSource.CODEC);
-        event.register(Registries.DENSITY_FUNCTION_TYPE, NovoAtlas.id("heightmap"), () -> HeightmapDensityFunction.DATA_CODEC);
-        event.register(Registries.DENSITY_FUNCTION_TYPE, NovoAtlas.id("get_height_from_map"), () -> GetHeightFromMapDensityFunction.DATA_CODEC);
-        event.register(Registries.DENSITY_FUNCTION_TYPE, NovoAtlas.id("get_preliminary_height_from_map"), () -> GetPreliminaryHeightFromMapDensityFunction.DATA_CODEC);
+        if (event.getRegistryKey() == Registries.CHUNK_GENERATOR) {
+            event.register(Registries.CHUNK_GENERATOR, NovoAtlas.id("image_map"), () -> ImageMapChunkGenerator.CODEC);
+            event.register(Registries.CHUNK_GENERATOR, NovoAtlas.expId("blend_image_map_to_random"), () -> BlendImageToRandomChunkGenerator.CODEC);
+        }
+
+        if (event.getRegistryKey() == Registries.BIOME_SOURCE) {
+            event.register(Registries.BIOME_SOURCE, NovoAtlas.id("color_map"), () -> ColorMapBiomeSource.CODEC);
+            event.register(Registries.BIOME_SOURCE, NovoAtlas.id("biome_cell_color_map"), () -> BiomeCellColorMapBiomeSource.CODEC);
+            event.register(Registries.BIOME_SOURCE, NovoAtlas.expId("bounded_biome_cell_color_map"), () -> BoundedMapBiomeSource.CODEC);
+        }
+
+        if (event.getRegistryKey() == Registries.DENSITY_FUNCTION_TYPE) {
+            event.register(Registries.DENSITY_FUNCTION_TYPE, NovoAtlas.id("heightmap"), () -> HeightmapDensityFunction.DATA_CODEC);
+            event.register(Registries.DENSITY_FUNCTION_TYPE, NovoAtlas.id("get_height_from_map"), () -> GetHeightFromMapDensityFunction.DATA_CODEC);
+            event.register(Registries.DENSITY_FUNCTION_TYPE, NovoAtlas.id("get_preliminary_height_from_map"), () -> GetPreliminaryHeightFromMapDensityFunction.DATA_CODEC);
+            event.register(Registries.DENSITY_FUNCTION_TYPE, NovoAtlas.expId("blend_at_map_border"), () -> BlendAtMapBorder.DATA_CODEC);
+        }
 
         if (event.getRegistryKey() == NovoAtlasRegistries.INTERPOLATOR_TYPE) {
             event.register(NovoAtlasRegistries.INTERPOLATOR_TYPE, NovoAtlas.id("nearest_neighbor"), () -> NearestNeighbour.CODEC);
@@ -104,8 +130,8 @@ public final class NovoAtlasNeoForge {
     }
 
     private static void registerResourceReloader(AddServerReloadListenersEvent event) {
-        event.addListener(NovoAtlasRegistries.HEIGHTMAP.identifier(), ImageManager.HEIGHTMAP);
-        event.addListener(NovoAtlasRegistries.BIOME_MAP.identifier(), ImageManager.BIOME_MAP);
+        event.addListener(NovoAtlasRegistries.HEIGHTMAP.identifier(), MapImageRegistry.HEIGHTMAP);
+        event.addListener(NovoAtlasRegistries.BIOME_MAP.identifier(), MapImageRegistry.BIOME_MAP);
     }
 
     private static void addDefaultAlias(Registry<?> registry, Identifier id) {
