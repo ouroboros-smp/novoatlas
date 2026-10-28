@@ -23,7 +23,7 @@ public final class BlendImageToRandomChunkGenerator extends ImageBasedChunkGener
                                     .forGetter(BlendImageToRandomChunkGenerator::getBiomeSource),
                             NoiseGeneratorSettings.CODEC
                                     .fieldOf("settings")
-                                    .forGetter(BlendImageToRandomChunkGenerator::generatorSettings),
+                                    .forGetter(BlendImageToRandomChunkGenerator::getBaseSettings),
                             MapInfo.CODEC
                                     .fieldOf("map_info")
                                     .forGetter(BlendImageToRandomChunkGenerator::getMapInfo),
@@ -40,6 +40,7 @@ public final class BlendImageToRandomChunkGenerator extends ImageBasedChunkGener
                     .apply(instance, BlendImageToRandomChunkGenerator::new)
     );
 
+    private final Holder<NoiseGeneratorSettings> baseSettings;
     private final float blendDistance;
 
     public BlendImageToRandomChunkGenerator(
@@ -57,6 +58,7 @@ public final class BlendImageToRandomChunkGenerator extends ImageBasedChunkGener
                 undergroundDensityFunction,
                 enableCarvers
         );
+        this.baseSettings = settings;
         this.blendDistance = blendDistance;
     }
 
@@ -121,6 +123,14 @@ public final class BlendImageToRandomChunkGenerator extends ImageBasedChunkGener
     @NonNull
     protected MapCodec<BlendImageToRandomChunkGenerator> codec() {
         return CODEC;
+    }
+
+    /// The noise settings as authored, before border blending is applied.
+    ///
+    /// Generation uses the wrapped router from {@link #generatorSettings()}. Serializing that
+    /// wrapped router would nest another {@code BlendAtMapBorder} on every save and load.
+    public Holder<NoiseGeneratorSettings> getBaseSettings() {
+        return baseSettings;
     }
 
     public float getBlendDistance() {

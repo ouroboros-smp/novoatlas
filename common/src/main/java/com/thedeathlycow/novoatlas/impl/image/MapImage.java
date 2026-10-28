@@ -12,8 +12,11 @@ public abstract class MapImage {
         this.height = height;
     }
 
-    /// Returns a positive distance to the edge of the image if the sampled point is inside the image,
-    /// and a negative distance if the sampled point is outside the image.
+    /// Returns the signed distance, in blocks, from the sampled block to the nearest image edge.
+    /// Positive when the block is inside the image, negative when it is outside.
+    ///
+    /// The index math is in pixels. Each pixel covers {@code horizontalScale} blocks, so the pixel
+    /// distance is scaled before it is compared with block-based blend distances.
     public final double getDistanceToEdge(int x, int z, MapInfo info) {
         double horizontalScale = info.horizontalScale().value();
         Vector2fc centerOffset = info.centerOffset();
@@ -27,12 +30,12 @@ public abstract class MapImage {
         if (insideX && insideZ) {
             double distX = Math.min(xR, this.width - xR);
             double distZ = Math.min(zR, this.height - zR);
-            return Math.min(distX, distZ);
+            return Math.min(distX, distZ) * horizontalScale;
         }
 
         double dx = Math.max(0, Math.max(-xR, xR - this.width));
         double dz = Math.max(0, Math.max(-zR, zR - this.height));
-        return -Math.sqrt(dx * dx + dz * dz);
+        return -Math.sqrt(dx * dx + dz * dz) * horizontalScale;
     }
 
     public final boolean isBlockInsideImage(int x, int z, MapInfo info) {
